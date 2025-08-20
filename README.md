@@ -56,6 +56,27 @@ const adapter = await MongooseAdapter.newAdapter('mongodb://your_mongodb_uri:270
 
 Additional information regard to options you can pass in you can find in [mongoose documentation](https://mongoosejs.com/docs/connections.html#options)
 
+## Using Existing Connection
+
+If you already have a Mongoose connection in your application, you can reuse it instead of creating a new one:
+
+```javascript
+const { MongooseAdapter } = require('casbin-mongoose-adapter');
+const mongoose = require('mongoose');
+
+// Your existing connection
+const connection = mongoose.createConnection('mongodb://your_mongodb_uri:27017');
+
+// Use existing connection with adapter
+const adapter = await MongooseAdapter.newAdapterWithConnection(connection);
+
+// Or with filtered adapter
+const filteredAdapter = await MongooseAdapter.newFilteredAdapterWithConnection(connection);
+
+// Or with synced adapter (for transactions)
+const syncedAdapter = await MongooseAdapter.newSyncedAdapterWithConnection(connection);
+```
+
 ## Filtered Adapter
 
 You can create an adapter instance that will load only those rules you need to.
