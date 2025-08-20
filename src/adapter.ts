@@ -30,7 +30,6 @@ export interface MongooseAdapterOptions {
   autoAbort?: boolean;
   autoCommit?: boolean;
   timestamps?: boolean;
-  connection?: Connection; // Add support for existing connection
 }
 
 export interface policyLine {
@@ -70,35 +69,23 @@ export class MongooseAdapter implements BatchAdapter, FilteredAdapter, Updatable
    * So, if you want to have a possibility to wait until connection successful, use newAdapter instead.
    *
    * @constructor
-   * @param {String} uri Mongo URI where casbin rules must be persisted (not required if using existing connection)
+   * @param {Connection} connection Mongoose connection to use
    * @param {Object} [options={}] Additional options to pass on to mongoose client
-   * @param {Object} [adapterOptions={}] adapterOptions additional adapter options including existing connection
+   * @param {Object} [adapterOptions={}] adapterOptions additional adapter options
    * @example
-   * const adapter = new MongooseAdapter('MONGO_URI');
-   * const adapter = new MongooseAdapter('MONGO_URI', { mongoose_options: 'here' });
-   * const adapter = new MongooseAdapter('', undefined, { connection: existingConnection });
+   * const adapter = new MongooseAdapter(existingConnection);
+   * const adapter = new MongooseAdapter(existingConnection, { mongoose_options: 'here' });
    */
-  constructor(uri: string, options?: ConnectOptions, adapterOptions?: MongooseAdapterOptions) {
+  constructor(connection: Connection, options?: ConnectOptions, adapterOptions?: MongooseAdapterOptions) {
     // by default, adapter is not filtered
     this.filtered = false;
     this.isSynced = false;
     this.autoAbort = false;
     
-    // Check if we should use existing connection or create new one
-    if (adapterOptions?.connection) {
-      // Use existing connection
-      this.connection = adapterOptions.connection;
-      this.uri = ''; // Not needed when using existing connection
-      this.options = options;
-    } else {
-      // Create new connection
-      if (!uri) {
-        throw new AdapterError('You must provide Mongo URI to connect to!');
-      }
-      this.uri = uri;
-      this.options = options;
-      this.connection = createConnection(this.uri, this.options);
-    }
+    // Use the provided connection
+    this.connection = connection;
+    this.uri = ''; // Not needed when using existing connection
+    this.options = options;
     
     this.casbinRule = this.connection.model<IModel>(
       modelName,
@@ -111,22 +98,21 @@ export class MongooseAdapter implements BatchAdapter, FilteredAdapter, Updatable
    * Creates a new instance of mongoose adapter for casbin.
    * Instead of constructor, it does wait for successfull connection to MongoDB.
    * Preferable way to construct an adapter instance, is to use this static method.
-   * For using existing connections, see newAdapterWithConnection.
    *
    * @static
-   * @param {String} uri Mongo URI where casbin rules must be persisted
+   * @param {Connection} connection Mongoose connection to use
    * @param {Object} [options={}] Additional options to pass on to mongoose client
    * @param {Object} [adapterOptions={}] Additional options to pass on to adapter
    * @example
-   * const adapter = await MongooseAdapter.newAdapter('MONGO_URI');
-   * const adapter = await MongooseAdapter.newAdapter('MONGO_URI', { mongoose_options: 'here' });
+   * const adapter = await MongooseAdapter.newAdapter(existingConnection);
+   * const adapter = await MongooseAdapter.newAdapter(existingConnection, { mongoose_options: 'here' });
    */
   static async newAdapter(
-    uri: string,
+    connection: Connection,
     options?: ConnectOptions,
     adapterOptions: MongooseAdapterOptions = {}
   ) {
-    const adapter = new MongooseAdapter(uri, options, adapterOptions);
+    const adapter = new MongooseAdapter(connection, options, adapterOptions);
     const {
       filtered = false,
       synced = false,
@@ -140,34 +126,7 @@ export class MongooseAdapter implements BatchAdapter, FilteredAdapter, Updatable
     return adapter;
   }
 
-  /**
-   * Creates a new instance of mongoose adapter for casbin using an existing connection.
-   * This method allows you to reuse an existing MongoDB connection instead of creating a new one.
-   *
-   * @static
-   * @param {Connection} connection Existing mongoose connection to use
-   * @param {Object} [adapterOptions={}] Additional options to pass on to adapter
-   * @example
-   * const adapter = await MongooseAdapter.newAdapterWithConnection(existingConnection);
-   * const adapter = await MongooseAdapter.newAdapterWithConnection(existingConnection, { timestamps: true });
-   */
-  static async newAdapterWithConnection(
-    connection: Connection,
-    adapterOptions: MongooseAdapterOptions = {}
-  ) {
-    const adapter = new MongooseAdapter('', undefined, { ...adapterOptions, connection });
-    const {
-      filtered = false,
-      synced = false,
-      autoAbort = false,
-      autoCommit = false
-    } = adapterOptions;
-    adapter.setFiltered(filtered);
-    adapter.setSynced(synced);
-    adapter.setAutoAbort(autoAbort);
-    adapter.setAutoCommit(autoCommit);
-    return adapter;
-  }
+
 
   /**
    * Creates a new instance of mongoose adapter for casbin.
@@ -175,41 +134,20 @@ export class MongooseAdapter implements BatchAdapter, FilteredAdapter, Updatable
    * That way, casbin will not call loadPolicy() automatically.
    *
    * @static
-   * @param {String} uri Mongo URI where casbin rules must be persisted
+   * @param {Connection} connection Mongoose connection to use
    * @param {Object} [options] Additional options to pass on to mongoose client
    * @example
-   * const adapter = await MongooseAdapter.newFilteredAdapter('MONGO_URI');
-   * const adapter = await MongooseAdapter.newFilteredAdapter('MONGO_URI', { mongoose_options: 'here' });
+   * const adapter = await MongooseAdapter.newFilteredAdapter(existingConnection);
+   * const adapter = await MongooseAdapter.newFilteredAdapter(existingConnection, { mongoose_options: 'here' });
    */
-  static async newFilteredAdapter(uri: string, options?: ConnectOptions) {
-    const adapter = await MongooseAdapter.newAdapter(uri, options, {
+  static async newFilteredAdapter(connection: Connection, options?: ConnectOptions) {
+    const adapter = await MongooseAdapter.newAdapter(connection, options, {
       filtered: true
     });
     return adapter;
   }
 
-  /**
-   * Creates a new instance of mongoose adapter for casbin using an existing connection.
-   * It does the same as newAdapterWithConnection, but it also sets a flag that this adapter is in filtered state.
-   * That way, casbin will not call loadPolicy() automatically.
-   *
-   * @static
-   * @param {Connection} connection Existing mongoose connection to use
-   * @param {Object} [adapterOptions={}] Additional options to pass on to adapter
-   * @example
-   * const adapter = await MongooseAdapter.newFilteredAdapterWithConnection(existingConnection);
-   * const adapter = await MongooseAdapter.newFilteredAdapterWithConnection(existingConnection, { timestamps: true });
-   */
-  static async newFilteredAdapterWithConnection(
-    connection: Connection,
-    adapterOptions: MongooseAdapterOptions = {}
-  ) {
-    const adapter = await MongooseAdapter.newAdapterWithConnection(connection, {
-      ...adapterOptions,
-      filtered: true
-    });
-    return adapter;
-  }
+
 
   /**
    * Creates a new instance of mongoose adapter for casbin.
@@ -218,54 +156,28 @@ export class MongooseAdapter implements BatchAdapter, FilteredAdapter, Updatable
    * Transactions are never commited automatically. You have to use commitTransaction to add pending changes.
    *
    * @static
-   * @param {String} uri Mongo URI where casbin rules must be persisted
+   * @param {Connection} connection Mongoose connection to use
    * @param {Object} [options={}] Additional options to pass on to mongoose client
    * @param {Boolean} autoAbort Whether to abort transactions on Error automatically
    * @param autoCommit
    * @example
-   * const adapter = await MongooseAdapter.newFilteredAdapter('MONGO_URI');
-   * const adapter = await MongooseAdapter.newFilteredAdapter('MONGO_URI', { mongoose_options: 'here' });
+   * const adapter = await MongooseAdapter.newSyncedAdapter(existingConnection);
+   * const adapter = await MongooseAdapter.newSyncedAdapter(existingConnection, { mongoose_options: 'here' });
    */
   static async newSyncedAdapter(
-    uri: string,
+    connection: Connection,
     options?: ConnectOptions,
     autoAbort: boolean = true,
     autoCommit = true
   ) {
-    return await MongooseAdapter.newAdapter(uri, options, {
+    return await MongooseAdapter.newAdapter(connection, options, {
       synced: true,
       autoAbort,
       autoCommit
     });
   }
 
-  /**
-   * Creates a new instance of mongoose adapter for casbin using an existing connection.
-   * It does the same as newAdapterWithConnection, but it enables transactions for the adapter.
-   * Transactions are never commited automatically. You have to use commitTransaction to add pending changes.
-   *
-   * @static
-   * @param {Connection} connection Existing mongoose connection to use
-   * @param {Object} [adapterOptions={}] Additional options to pass on to adapter
-   * @param {Boolean} autoAbort Whether to abort transactions on Error automatically
-   * @param {Boolean} autoCommit Whether to commit transactions automatically
-   * @example
-   * const adapter = await MongooseAdapter.newSyncedAdapterWithConnection(existingConnection);
-   * const adapter = await MongooseAdapter.newSyncedAdapterWithConnection(existingConnection, { timestamps: true }, true, false);
-   */
-  static async newSyncedAdapterWithConnection(
-    connection: Connection,
-    adapterOptions: MongooseAdapterOptions = {},
-    autoAbort: boolean = true,
-    autoCommit = true
-  ) {
-    return await MongooseAdapter.newAdapterWithConnection(connection, {
-      ...adapterOptions,
-      synced: true,
-      autoAbort,
-      autoCommit
-    });
-  }
+
 
   /**
    * Switch adapter to (non)filtered state.

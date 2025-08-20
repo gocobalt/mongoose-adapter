@@ -33,12 +33,14 @@ Require it in a place, where you are instantiating an enforcer ([read more about
 const path = require('path');
 const { newEnforcer } = require('casbin');
 const { MongooseAdapter } = require('casbin-mongoose-adapter');
+const mongoose = require('mongoose');
 
 // const MongooseAdapter = require('casbin-mongoose-adapter');
 // You should use this in v2.x
 
 const model = path.resolve(__dirname, './your_model.conf');
-const adapter = await MongooseAdapter.newAdapter('mongodb://your_mongodb_uri:27017');
+const connection = mongoose.createConnection('mongodb://your_mongodb_uri:27017');
+const adapter = await MongooseAdapter.newAdapter(connection);
 const enforcer = await newEnforcer(model, adapter);
 ```
 
@@ -51,31 +53,13 @@ You can pass mongooose-specific options when instantiating the adapter:
 
 ```javascript
 const { MongooseAdapter } = require('casbin-mongoose-adapter');
-const adapter = await MongooseAdapter.newAdapter('mongodb://your_mongodb_uri:27017', { mongoose_options: 'here' });
+const mongoose = require('mongoose');
+
+const connection = mongoose.createConnection('mongodb://your_mongodb_uri:27017');
+const adapter = await MongooseAdapter.newAdapter(connection, { mongoose_options: 'here' });
 ```
 
 Additional information regard to options you can pass in you can find in [mongoose documentation](https://mongoosejs.com/docs/connections.html#options)
-
-## Using Existing Connection
-
-If you already have a Mongoose connection in your application, you can reuse it instead of creating a new one:
-
-```javascript
-const { MongooseAdapter } = require('casbin-mongoose-adapter');
-const mongoose = require('mongoose');
-
-// Your existing connection
-const connection = mongoose.createConnection('mongodb://your_mongodb_uri:27017');
-
-// Use existing connection with adapter
-const adapter = await MongooseAdapter.newAdapterWithConnection(connection);
-
-// Or with filtered adapter
-const filteredAdapter = await MongooseAdapter.newFilteredAdapterWithConnection(connection);
-
-// Or with synced adapter (for transactions)
-const syncedAdapter = await MongooseAdapter.newSyncedAdapterWithConnection(connection);
-```
 
 ## Filtered Adapter
 
@@ -88,7 +72,10 @@ For such cases, filtered adapter exists in casbin.
 
 ```javascript
 const { MongooseAdapter } = require('casbin-mongoose-adapter');
-const adapter = await MongooseAdapter.newFilteredAdapter('mongodb://your_mongodb_uri:27017');
+const mongoose = require('mongoose');
+
+const connection = mongoose.createConnection('mongodb://your_mongodb_uri:27017');
+const adapter = await MongooseAdapter.newFilteredAdapter(connection);
 ```
 
 ## License
