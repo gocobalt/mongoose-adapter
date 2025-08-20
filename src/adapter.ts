@@ -30,6 +30,7 @@ export interface MongooseAdapterOptions {
   autoAbort?: boolean;
   autoCommit?: boolean;
   timestamps?: boolean;
+  collectionName?: string; // Custom collection name
 }
 
 export interface policyLine {
@@ -71,10 +72,11 @@ export class MongooseAdapter implements BatchAdapter, FilteredAdapter, Updatable
    * @constructor
    * @param {Connection} connection Mongoose connection to use
    * @param {Object} [options={}] Additional options to pass on to mongoose client
-   * @param {Object} [adapterOptions={}] adapterOptions additional adapter options
+   * @param {Object} [adapterOptions={}] adapterOptions additional adapter options including custom collection name
    * @example
    * const adapter = new MongooseAdapter(existingConnection);
    * const adapter = new MongooseAdapter(existingConnection, { mongoose_options: 'here' });
+   * const adapter = new MongooseAdapter(existingConnection, undefined, { collectionName: 'rbacPolicies' });
    */
   constructor(connection: Connection, options?: ConnectOptions, adapterOptions?: MongooseAdapterOptions) {
     // by default, adapter is not filtered
@@ -90,7 +92,7 @@ export class MongooseAdapter implements BatchAdapter, FilteredAdapter, Updatable
     this.casbinRule = this.connection.model<IModel>(
       modelName,
       schema(adapterOptions?.timestamps),
-      collectionName
+      adapterOptions?.collectionName || collectionName
     );
   }
 

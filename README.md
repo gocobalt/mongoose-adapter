@@ -57,6 +57,11 @@ const mongoose = require('mongoose');
 
 const connection = mongoose.createConnection('mongodb://your_mongodb_uri:27017');
 const adapter = await MongooseAdapter.newAdapter(connection, { mongoose_options: 'here' });
+
+// With custom collection name
+const adapterWithCustomCollection = await MongooseAdapter.newAdapter(connection, undefined, { 
+  collectionName: 'rbacPolicies' 
+});
 ```
 
 Additional information regard to options you can pass in you can find in [mongoose documentation](https://mongoosejs.com/docs/connections.html#options)
